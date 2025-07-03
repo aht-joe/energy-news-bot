@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Any
 from datetime import datetime
 
-from .config import Config
+from config import Config
 
 
 class NewsProcessor:
@@ -33,17 +33,21 @@ class NewsProcessor:
     
     def _should_include_article(self, article: Dict[str, Any]) -> bool:
         """Determine if an article should be included based on filtering criteria."""
-        content = article.get("content", "").lower()
-        title = article.get("title", "").lower()
+        content = article.get("content", "")
+        title = article.get("title", "")
         text = f"{title} {content}"
         
-        if self.config.keywords:
-            has_keyword = any(keyword.lower() in text for keyword in self.config.keywords)
-            if not has_keyword:
+        if not self._contains_japanese(text):
+            return False
+        
+        if self.config.japanese_keywords:
+            has_japanese_keyword = any(keyword in text for keyword in self.config.japanese_keywords)
+            if not has_japanese_keyword:
                 return False
         
         if self.config.exclude_keywords:
-            has_excluded = any(keyword.lower() in text for keyword in self.config.exclude_keywords)
+            text_lower = text.lower()
+            has_excluded = any(keyword.lower() in text_lower for keyword in self.config.exclude_keywords)
             if has_excluded:
                 return False
         
@@ -68,3 +72,18 @@ class NewsProcessor:
     def _extract_topics(self, article: Dict[str, Any]) -> List[str]:
         """Extract topics from an article (placeholder implementation)."""
         return ["energy", "industry"]
+    
+    def _contains_japanese(self, text: str) -> bool:
+        """Check if text contains Japanese characters."""
+        japanese_ranges = [
+            (0x3040, 0x309F),  # Hiragana
+            (0x30A0, 0x30FF),  # Katakana
+            (0x4E00, 0x9FAF),  # CJK Unified Ideographs
+        ]
+        
+        for char in text:
+            char_code = ord(char)
+            for start, end in japanese_ranges:
+                if start <= char_code <= end:
+                    return True
+        return False
