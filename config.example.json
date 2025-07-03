@@ -1,0 +1,29 @@
+{
+  "news_sources": [
+    "energynews.com",
+    "renewableenergyworld.com",
+    "oilprice.com"
+  ],
+  "api_keys": {
+    "news_api": "your_news_api_key_here",
+    "openai": "your_openai_api_key_here"
+  },
+  "max_articles_per_source": 50,
+  "update_interval_hours": 6,
+  "output_format": "json",
+  "output_directory": "data/processed",
+  "keywords": [
+    "renewable energy",
+    "solar power",
+    "wind energy",
+    "oil prices",
+    "natural gas",
+    "energy transition",
+    "climate change",
+    "carbon emissions"
+  ],
+  "exclude_keywords": [
+    "advertisement",
+    "sponsored content"
+  ]
+}
