@@ -17,6 +17,7 @@ class Config:
     teams_webhook_url: str
     
     max_articles_per_source: int
+    max_teams_posts: int
     update_interval_hours: int
     
     output_format: str
