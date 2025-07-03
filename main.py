@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-from .config import Config
-from .news_collector import NewsCollector
-from .news_processor import NewsProcessor
+from config import Config
+from news_collector import NewsCollector
+from news_processor import NewsProcessor
 
 
 def setup_logging(log_level: str = "INFO") -> None:
@@ -37,6 +37,9 @@ def main() -> None:
         collector = NewsCollector(config)
         processor = NewsProcessor(config)
         
+        from teams_notifier import TeamsNotifier
+        notifier = TeamsNotifier(config)
+        
         logger.info("Starting news collection...")
         news_articles = collector.collect_news()
         logger.info(f"Collected {len(news_articles)} articles")
@@ -44,6 +47,13 @@ def main() -> None:
         logger.info("Starting news processing...")
         processed_articles = processor.process_articles(news_articles)
         logger.info(f"Processed {len(processed_articles)} articles")
+        
+        if processed_articles:
+            logger.info("Posting articles to Teams...")
+            notifier.post_articles(processed_articles)
+            logger.info(f"Posted {len(processed_articles)} articles to Teams")
+        else:
+            logger.info("No articles matched the filtering criteria")
         
         logger.info("Energy news bot completed successfully")
         

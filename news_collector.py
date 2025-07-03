@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Any
 from datetime import datetime
 
-from .config import Config
+from config import Config
 
 
 class NewsCollector:
@@ -16,36 +16,45 @@ class NewsCollector:
         self.logger = logging.getLogger(__name__)
     
     def collect_news(self) -> List[Dict[str, Any]]:
-        """Collect news articles from configured sources."""
+        """Collect news articles from configured RSS feeds."""
         all_articles = []
         
-        for source in self.config.news_sources:
+        for rss_feed in self.config.rss_feeds:
             try:
-                self.logger.info(f"Collecting news from {source}")
-                articles = self._collect_from_source(source)
-                all_articles.extend(articles)
+                self.logger.info(f"Collecting news from RSS feed: {rss_feed}")
+                articles = self._collect_from_source(rss_feed)
                 
                 if len(articles) > self.config.max_articles_per_source:
                     articles = articles[:self.config.max_articles_per_source]
                     
+                all_articles.extend(articles)
+                    
             except Exception as e:
-                self.logger.error(f"Error collecting from {source}: {e}")
+                self.logger.error(f"Error collecting from {rss_feed}: {e}")
                 continue
         
         return all_articles
     
     def _collect_from_source(self, source: str) -> List[Dict[str, Any]]:
-        """Collect articles from a specific news source."""
+        """Collect articles from a specific RSS feed."""
+        articles = []
         
-        sample_articles = [
-            {
-                "title": f"Sample Energy News Article from {source}",
-                "content": "This is a sample article about energy industry developments.",
-                "url": f"https://{source}/sample-article",
-                "published_date": datetime.now().isoformat(),
-                "source": source,
-                "author": "Energy Reporter",
-            }
-        ]
-        
-        return sample_articles
+        try:
+            import feedparser
+            feed = feedparser.parse(source)
+            
+            for entry in feed.entries:
+                article = {
+                    "title": entry.get("title", ""),
+                    "content": entry.get("summary", ""),
+                    "url": entry.get("link", ""),
+                    "published_date": entry.get("published", ""),
+                    "source": source,
+                    "author": entry.get("author", "Unknown"),
+                }
+                articles.append(article)
+                
+        except Exception as e:
+            self.logger.error(f"Error parsing RSS feed {source}: {e}")
+            
+        return articles

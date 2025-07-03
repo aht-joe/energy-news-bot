@@ -4,10 +4,15 @@
     "renewableenergyworld.com",
     "oilprice.com"
   ],
+  "rss_feeds": [
+    "https://renewablesnow.com/news/news_feed/?region=asia+pacific",
+    "https://www.pv-magazine.com/feed/"
+  ],
   "api_keys": {
     "news_api": "your_news_api_key_here",
     "openai": "your_openai_api_key_here"
   },
+  "teams_webhook_url": "https://your-tenant.webhook.office.com/webhookb2/your-webhook-url",
   "max_articles_per_source": 50,
   "update_interval_hours": 6,
   "output_format": "json",
@@ -21,6 +26,12 @@
     "energy transition",
     "climate change",
     "carbon emissions"
+  ],
+  "japanese_keywords": [
+    "太陽光発電",
+    "CPPA",
+    "PPA",
+    "系統用蓄電池"
   ],
   "exclude_keywords": [
     "advertisement",

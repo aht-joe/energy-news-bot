@@ -11,8 +11,10 @@ class Config:
     """Configuration class for the Energy News Bot."""
     
     news_sources: List[str]
+    rss_feeds: List[str]
     
     api_keys: Dict[str, str]
+    teams_webhook_url: str
     
     max_articles_per_source: int
     update_interval_hours: int
@@ -21,6 +23,7 @@ class Config:
     output_directory: str
     
     keywords: List[str]
+    japanese_keywords: List[str]
     exclude_keywords: List[str]
     
     @classmethod
