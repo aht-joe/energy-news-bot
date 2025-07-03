@@ -14,6 +14,7 @@
   },
   "teams_webhook_url": "https://bluefieldenergyinc.webhook.office.com/webhookb2/6d25b8d6-84e5-4eaa-a04a-4f8bd98c997f@f9bfa3d1-84fb-4837-a9b2-0e580fe6b50a/IncomingWebhook/4115cacff2054a1ea47932fec76f7146/83a23973-f0b1-4240-9c75-b0a4a7717af4/V2dK9fNzn1mYuFA3bEIDJFDBqV5-2VKnXDluekUFN952o1",
   "max_articles_per_source": 50,
+  "max_teams_posts": 5,
   "update_interval_hours": 6,
   "output_format": "json",
   "output_directory": "data/processed",

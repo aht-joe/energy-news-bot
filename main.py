@@ -49,9 +49,11 @@ def main() -> None:
         logger.info(f"Processed {len(processed_articles)} articles")
         
         if processed_articles:
+            articles_to_post = processed_articles[:config.max_teams_posts]
+            logger.info(f"Limiting to top {config.max_teams_posts} articles for Teams posting")
             logger.info("Posting articles to Teams...")
-            notifier.post_articles(processed_articles)
-            logger.info(f"Posted {len(processed_articles)} articles to Teams")
+            notifier.post_articles(articles_to_post)
+            logger.info(f"Posted {len(articles_to_post)} articles to Teams")
         else:
             logger.info("No articles matched the filtering criteria")
         
