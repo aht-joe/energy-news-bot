@@ -45,12 +45,6 @@ class NewsProcessor:
             if not has_japanese_keyword:
                 return False
         
-        if self.config.keywords:
-            text_lower = text.lower()
-            has_keyword = any(keyword.lower() in text_lower for keyword in self.config.keywords)
-            if not has_keyword:
-                return False
-        
         if self.config.exclude_keywords:
             text_lower = text.lower()
             has_excluded = any(keyword.lower() in text_lower for keyword in self.config.exclude_keywords)
