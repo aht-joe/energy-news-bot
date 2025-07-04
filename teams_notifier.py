@@ -17,10 +17,22 @@ class TeamsNotifier:
         self.logger = logging.getLogger(__name__)
         
     def post_article(self, article: Dict[str, Any]) -> bool:
-        """Post a single article to Teams."""
+        """Post a single article to Teams with category label."""
         try:
+            category_labels = {
+                "government": "[政府]",
+                "market": "[市場]", 
+                "municipality": "[自治体]",
+                "general": ""
+            }
+            
+            category = article.get("category", "general")
+            label = category_labels.get(category, "")
+            
+            title_with_label = f"{label} {article['title']}" if label else article['title']
+            
             message = {
-                "text": f"**{article['title']}**\n\n[Read more]({article['url']})"
+                "text": f"**{title_with_label}**\n\n[Read more]({article['url']})"
             }
             
             response = requests.post(

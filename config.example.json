@@ -8,6 +8,41 @@
     "https://renewablesnow.com/news/news_feed/?region=asia+pacific",
     "https://www.pv-magazine.com/feed/"
   ],
+  "government_rss_feeds": [
+    "https://www.meti.go.jp/ml_index_release_atom.xml",
+    "https://www.meti.go.jp/statistics/st_news.xml"
+  ],
+  "government_scrape_sources": [
+    {
+      "name": "Agency for Natural Resources and Energy",
+      "url": "https://www.enecho.meti.go.jp/",
+      "news_selector": ".news-list .news-item",
+      "title_selector": ".news-title",
+      "link_selector": "a",
+      "date_selector": ".news-date"
+    }
+  ],
+  "market_rss_feeds": [],
+  "market_scrape_sources": [
+    {
+      "name": "JEPX",
+      "url": "https://www.jepx.jp/",
+      "news_selector": ".news-list li",
+      "title_selector": "a",
+      "link_selector": "a",
+      "date_selector": ".date"
+    },
+    {
+      "name": "OCCTO",
+      "url": "https://www.occto.or.jp/iinkai/kouikikeitouseibi/index.html",
+      "news_selector": ".meeting-list tr",
+      "title_selector": "td:first-child",
+      "link_selector": "a",
+      "date_selector": ".date"
+    }
+  ],
+  "municipality_rss_feeds": [],
+  "municipality_scrape_sources": [],
   "api_keys": {
     "news_api": "your_news_api_key_here",
     "openai": "your_openai_api_key_here"
