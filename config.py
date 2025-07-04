@@ -13,6 +13,13 @@ class Config:
     news_sources: List[str]
     rss_feeds: List[str]
     
+    government_rss_feeds: List[str]
+    government_scrape_sources: List[Dict[str, str]]
+    market_rss_feeds: List[str]
+    market_scrape_sources: List[Dict[str, str]]
+    municipality_rss_feeds: List[str]
+    municipality_scrape_sources: List[Dict[str, str]]
+    
     api_keys: Dict[str, str]
     teams_webhook_url: str
     
