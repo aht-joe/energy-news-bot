@@ -15,7 +15,9 @@
   "government_scrape_sources": [],
   "market_rss_feeds": [
     "https://asia.nikkei.com/rss/feed/nar",
-    "https://www.itmedia.co.jp/smartjapan/rss/rss2.xml"
+    "https://www.itmedia.co.jp/smartjapan/rss/rss2.xml",
+    "https://solarjournal.jp/feed/",
+    "https://www.kankyo-business.jp/feed"
   ],
   "market_scrape_sources": [
     {
