@@ -12,24 +12,18 @@
     "https://www.nhk.or.jp/rss/news/cat5.xml",
     "https://www.nhk.or.jp/rss/news/cat3.xml"
   ],
-  "government_scrape_sources": [
-    {
-      "name": "Agency for Natural Resources and Energy",
-      "url": "https://www.enecho.meti.go.jp/",
-      "news_selector": ".news-list .news-item",
-      "title_selector": ".news-title",
-      "link_selector": "a",
-      "date_selector": ".news-date"
-    }
-  ],
+  "government_scrape_sources": [],
   "market_rss_feeds": [
-    "https://asia.nikkei.com/rss/feed/nar"
+    "https://asia.nikkei.com/rss/feed/nar",
+    "https://www.itmedia.co.jp/smartjapan/rss/rss2.xml",
+    "https://solarjournal.jp/feed/",
+    "https://www.kankyo-business.jp/feed"
   ],
   "market_scrape_sources": [
     {
       "name": "JEPX",
       "url": "https://www.jepx.jp/",
-      "news_selector": ".news-section a, .notice-section a, h3:contains('お知らせ') + ul a",
+      "news_selector": "a[href*='/market/'], a[href*='/news/']",
       "title_selector": "",
       "link_selector": "",
       "date_selector": ""
