@@ -1,9 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from typing import List, Optional
 import sqlite3
 import sys
 import os
+import secrets
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -17,6 +19,19 @@ app = FastAPI(
     description="API for managing energy news articles, keywords, and companies with relevance scoring and Teams integration",
     version="1.0.0"
 )
+
+security = HTTPBasic()
+
+def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = secrets.compare_digest(credentials.username, "admin")
+    correct_password = secrets.compare_digest(credentials.password, "bluefield2025!")
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 class ArticleCreate(BaseModel):
     url: str
@@ -83,11 +98,11 @@ async def startup_event():
     init_database()
 
 @app.get("/")
-async def root():
+async def root(username: str = Depends(authenticate)):
     return {"message": "Energy News Bot API", "docs": "/docs"}
 
 @app.post("/articles/", response_model=Article)
-async def create_article(article: ArticleCreate):
+async def create_article(article: ArticleCreate, username: str = Depends(authenticate)):
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -102,7 +117,7 @@ async def create_article(article: ArticleCreate):
         raise HTTPException(status_code=400, detail="Article URL already exists")
 
 @app.get("/articles/", response_model=List[Article])
-async def get_articles():
+async def get_articles(username: str = Depends(authenticate)):
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -114,7 +129,7 @@ async def get_articles():
     return articles
 
 @app.delete("/articles/{article_id}")
-async def delete_article(article_id: int):
+async def delete_article(article_id: int, username: str = Depends(authenticate)):
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -128,7 +143,7 @@ async def delete_article(article_id: int):
     return {"message": "Article deleted successfully"}
 
 @app.post("/keywords/", response_model=Keyword)
-async def create_keyword(keyword: KeywordCreate):
+async def create_keyword(keyword: KeywordCreate, username: str = Depends(authenticate)):
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -143,7 +158,7 @@ async def create_keyword(keyword: KeywordCreate):
         raise HTTPException(status_code=400, detail="Keyword already exists")
 
 @app.get("/keywords/", response_model=List[Keyword])
-async def get_keywords():
+async def get_keywords(username: str = Depends(authenticate)):
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -155,7 +170,7 @@ async def get_keywords():
     return keywords
 
 @app.delete("/keywords/{keyword_id}")
-async def delete_keyword(keyword_id: int):
+async def delete_keyword(keyword_id: int, username: str = Depends(authenticate)):
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -169,7 +184,7 @@ async def delete_keyword(keyword_id: int):
     return {"message": "Keyword deleted successfully"}
 
 @app.post("/companies/", response_model=Company)
-async def create_company(company: CompanyCreate):
+async def create_company(company: CompanyCreate, username: str = Depends(authenticate)):
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -184,7 +199,7 @@ async def create_company(company: CompanyCreate):
         raise HTTPException(status_code=400, detail="Company already exists")
 
 @app.get("/companies/", response_model=List[Company])
-async def get_companies():
+async def get_companies(username: str = Depends(authenticate)):
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -196,7 +211,7 @@ async def get_companies():
     return companies
 
 @app.delete("/companies/{company_id}")
-async def delete_company(company_id: int):
+async def delete_company(company_id: int, username: str = Depends(authenticate)):
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -210,7 +225,7 @@ async def delete_company(company_id: int):
     return {"message": "Company deleted successfully"}
 
 @app.get("/articles/{article_id}/relevance", response_model=RelevanceScore)
-async def get_article_relevance(article_id: int):
+async def get_article_relevance(article_id: int, username: str = Depends(authenticate)):
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -265,7 +280,7 @@ async def get_article_relevance(article_id: int):
         raise HTTPException(status_code=500, detail=f"Error calculating relevance: {str(e)}")
 
 @app.post("/process-articles/", response_model=ProcessingResult)
-async def process_articles():
+async def process_articles(username: str = Depends(authenticate)):
     try:
         config = Config.load_from_file("config.json")
         
@@ -303,7 +318,7 @@ async def process_articles():
         raise HTTPException(status_code=500, detail=f"Error processing articles: {str(e)}")
 
 @app.post("/teams/post-high-relevance/")
-async def post_high_relevance_articles(threshold: float = 0.75):
+async def post_high_relevance_articles(threshold: float = 0.75, username: str = Depends(authenticate)):
     try:
         config = Config.load_from_file("config.json")
         conn = get_db_connection()
