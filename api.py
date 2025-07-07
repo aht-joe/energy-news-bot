@@ -261,8 +261,9 @@ async def get_companies():
     companies = []
     for row in c.execute("SELECT id, name FROM companies"):
         companies.append(Company(id=row["id"], name=row["name"]))
+        logger.debug(f"Found company: {row['name']} (ID: {row['id']})")
     
-    logger.info(f"Returning {len(companies)} companies")
+    logger.info(f"Returning {len(companies)} companies with IDs: {[c.id for c in companies]}")
     conn.close()
     return companies
 
