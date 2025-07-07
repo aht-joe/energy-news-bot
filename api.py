@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -18,6 +18,8 @@ app = FastAPI(
     description="API for managing energy news articles, keywords, and companies with relevance scoring and Teams integration",
     version="1.0.0"
 )
+
+api_router = APIRouter(prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
@@ -96,7 +98,7 @@ async def startup_event():
 async def root():
     return {"message": "Energy News Bot API", "docs": "/docs"}
 
-@app.post("/articles/", response_model=Article)
+@api_router.post("/articles/", response_model=Article)
 async def create_article(article: ArticleCreate):
     conn = get_db_connection()
     c = conn.cursor()
@@ -111,7 +113,7 @@ async def create_article(article: ArticleCreate):
         conn.close()
         raise HTTPException(status_code=400, detail="Article URL already exists")
 
-@app.get("/articles/", response_model=List[Article])
+@api_router.get("/articles/", response_model=List[Article])
 async def get_articles():
     conn = get_db_connection()
     c = conn.cursor()
@@ -123,7 +125,7 @@ async def get_articles():
     conn.close()
     return articles
 
-@app.delete("/articles/{article_id}")
+@api_router.delete("/articles/{article_id}")
 async def delete_article(article_id: int):
     conn = get_db_connection()
     c = conn.cursor()
@@ -137,7 +139,7 @@ async def delete_article(article_id: int):
     conn.close()
     return {"message": "Article deleted successfully"}
 
-@app.post("/keywords/", response_model=Keyword)
+@api_router.post("/keywords/", response_model=Keyword)
 async def create_keyword(keyword: KeywordCreate):
     conn = get_db_connection()
     c = conn.cursor()
@@ -152,7 +154,7 @@ async def create_keyword(keyword: KeywordCreate):
         conn.close()
         raise HTTPException(status_code=400, detail="Keyword already exists")
 
-@app.get("/keywords/", response_model=List[Keyword])
+@api_router.get("/keywords/", response_model=List[Keyword])
 async def get_keywords():
     conn = get_db_connection()
     c = conn.cursor()
@@ -164,7 +166,7 @@ async def get_keywords():
     conn.close()
     return keywords
 
-@app.delete("/keywords/{keyword_id}")
+@api_router.delete("/keywords/{keyword_id}")
 async def delete_keyword(keyword_id: int):
     conn = get_db_connection()
     c = conn.cursor()
@@ -178,7 +180,7 @@ async def delete_keyword(keyword_id: int):
     conn.close()
     return {"message": "Keyword deleted successfully"}
 
-@app.post("/companies/", response_model=Company)
+@api_router.post("/companies/", response_model=Company)
 async def create_company(company: CompanyCreate):
     conn = get_db_connection()
     c = conn.cursor()
@@ -193,7 +195,7 @@ async def create_company(company: CompanyCreate):
         conn.close()
         raise HTTPException(status_code=400, detail="Company already exists")
 
-@app.get("/companies/", response_model=List[Company])
+@api_router.get("/companies/", response_model=List[Company])
 async def get_companies():
     conn = get_db_connection()
     c = conn.cursor()
@@ -205,7 +207,7 @@ async def get_companies():
     conn.close()
     return companies
 
-@app.delete("/companies/{company_id}")
+@api_router.delete("/companies/{company_id}")
 async def delete_company(company_id: int):
     conn = get_db_connection()
     c = conn.cursor()
@@ -219,7 +221,7 @@ async def delete_company(company_id: int):
     conn.close()
     return {"message": "Company deleted successfully"}
 
-@app.get("/articles/{article_id}/relevance", response_model=RelevanceScore)
+@api_router.get("/articles/{article_id}/relevance", response_model=RelevanceScore)
 async def get_article_relevance(article_id: int):
     conn = get_db_connection()
     c = conn.cursor()
@@ -274,7 +276,7 @@ async def get_article_relevance(article_id: int):
         conn.close()
         raise HTTPException(status_code=500, detail=f"Error calculating relevance: {str(e)}")
 
-@app.post("/process-articles/", response_model=ProcessingResult)
+@api_router.post("/process-articles/", response_model=ProcessingResult)
 async def process_articles():
     try:
         config = Config.load_from_file("config.json")
@@ -312,7 +314,7 @@ async def process_articles():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing articles: {str(e)}")
 
-@app.post("/teams/post-high-relevance/")
+@api_router.post("/teams/post-high-relevance/")
 async def post_high_relevance_articles(threshold: float = 0.75):
     try:
         config = Config.load_from_file("config.json")
@@ -367,3 +369,14 @@ async def post_high_relevance_articles(threshold: float = 0.75):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error posting to Teams: {str(e)}")
+
+app.include_router(api_router)
+
+print("=== DEBUG: Final route registration ===")
+print(f"APIRouter routes count: {len(api_router.routes)}")
+for route in api_router.routes:
+    print(f"APIRouter route: {route.path} - Methods: {getattr(route, 'methods', 'N/A')}")
+print(f"App routes count: {len(app.routes)}")
+for route in app.routes:
+    print(f"App route: {route.path} - Methods: {getattr(route, 'methods', 'N/A')}")
+print("=== END DEBUG ===")
