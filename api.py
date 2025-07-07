@@ -16,7 +16,8 @@ from teams_notifier import TeamsNotifier
 app = FastAPI(
     title="Energy News Bot API",
     description="API for managing energy news articles, keywords, and companies with relevance scoring and Teams integration",
-    version="1.0.0"
+    version="1.0.0",
+    redirect_slashes=False
 )
 
 api_router = APIRouter(prefix="/api")
@@ -113,6 +114,7 @@ async def create_article(article: ArticleCreate):
         conn.close()
         raise HTTPException(status_code=400, detail="Article URL already exists")
 
+@api_router.get("/articles", response_model=List[Article])
 @api_router.get("/articles/", response_model=List[Article])
 async def get_articles():
     conn = get_db_connection()
@@ -154,6 +156,7 @@ async def create_keyword(keyword: KeywordCreate):
         conn.close()
         raise HTTPException(status_code=400, detail="Keyword already exists")
 
+@api_router.get("/keywords", response_model=List[Keyword])
 @api_router.get("/keywords/", response_model=List[Keyword])
 async def get_keywords():
     conn = get_db_connection()
@@ -195,6 +198,7 @@ async def create_company(company: CompanyCreate):
         conn.close()
         raise HTTPException(status_code=400, detail="Company already exists")
 
+@api_router.get("/companies", response_model=List[Company])
 @api_router.get("/companies/", response_model=List[Company])
 async def get_companies():
     conn = get_db_connection()
