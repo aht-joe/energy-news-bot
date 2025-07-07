@@ -5,6 +5,7 @@ from typing import List, Optional
 import sqlite3
 import sys
 import os
+import logging
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -213,17 +214,27 @@ async def get_companies():
 
 @api_router.delete("/companies/{company_id}")
 async def delete_company(company_id: int):
+    logger = logging.getLogger(__name__)
+    logger.info(f"DELETE request received for company ID: {company_id}")
+    
     conn = get_db_connection()
     c = conn.cursor()
     
-    c.execute("DELETE FROM companies WHERE id = ?", (company_id,))
-    if c.rowcount == 0:
+    company_row = c.execute("SELECT name FROM companies WHERE id = ?", (company_id,)).fetchone()
+    if not company_row:
         conn.close()
+        logger.info(f"Company with ID {company_id} not found")
         raise HTTPException(status_code=404, detail="Company not found")
     
+    company_name = company_row["name"]
+    logger.info(f"Deleting company: {company_name} (ID: {company_id})")
+    
+    c.execute("DELETE FROM companies WHERE id = ?", (company_id,))
     conn.commit()
     conn.close()
-    return {"message": "Company deleted successfully"}
+    
+    logger.info(f"Successfully deleted company: {company_name} (ID: {company_id})")
+    return {"message": "deleted"}
 
 @api_router.get("/articles/{article_id}/relevance", response_model=RelevanceScore)
 async def get_article_relevance(article_id: int):
