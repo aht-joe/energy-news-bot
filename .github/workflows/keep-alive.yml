@@ -1,0 +1,35 @@
+name: Keep Render Service Alive
+
+on:
+  schedule:
+    # Run every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Service
+        run: |
+          echo "Pinging Render service to prevent sleep..."
+          response=$(curl -s -w "HTTPSTATUS:%{http_code};TIME:%{time_total}" \
+            https://energy-news-bot.onrender.com/)
+          
+          http_code=$(echo "$response" | sed -n 's/.*HTTPSTATUS:\([0-9]*\).*/\1/p')
+          time_total=$(echo "$response" | sed -n 's/.*TIME:\([0-9.]*\).*/\1/p')
+          
+          echo "HTTP Status: $http_code"
+          echo "Response Time: ${time_total}s"
+          echo "Response Body: $(echo "$response" | sed 's/HTTPSTATUS:.*$//')"
+          
+          if [ "$http_code" -eq 200 ]; then
+            echo "✅ Ping successful - service is alive"
+          else
+            echo "❌ Ping failed with status $http_code"
+            exit 1
+          fi
+      
+      - name: Log timestamp
+        run: |
+          echo "Keep-alive ping completed at: $(date -u)"
