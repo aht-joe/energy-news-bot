@@ -144,3 +144,46 @@ class NewsCollector:
             self.logger.error(f"Error scraping {source['name']}: {e}")
             
         return articles
+    
+    def fetch_article_content(self, url: str) -> Dict[str, Any]:
+        """Fetch article content from a given URL using web scraping."""
+        try:
+            import requests
+            from bs4 import BeautifulSoup
+            
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            title = ""
+            title_selectors = ['h1', 'title', '.title', '#title']
+            for selector in title_selectors:
+                title_elem = soup.select_one(selector)
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    break
+            
+            content = ""
+            content_selectors = ['article', '.content', '.article-content', '.post-content', 'main', '.main']
+            for selector in content_selectors:
+                content_elem = soup.select_one(selector)
+                if content_elem:
+                    content = content_elem.get_text(strip=True)
+                    break
+            
+            if not content:
+                paragraphs = soup.find_all('p')
+                content = ' '.join([p.get_text(strip=True) for p in paragraphs])
+            
+            return {
+                'title': title,
+                'content': content,
+                'url': url,
+                'source': url,
+                'author': 'Unknown'
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error fetching article content from {url}: {e}")
+            return None
