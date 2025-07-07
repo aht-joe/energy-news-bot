@@ -65,6 +65,14 @@ class ProcessingResult(BaseModel):
     posted_to_teams: int
     message: str
 
+class PickupResult(BaseModel):
+    title: str
+    matched_keywords: List[str]
+    matched_companies: List[str]
+    importance: str  # "High", "Medium", "Low"
+    summary: str
+    url: str
+
 def get_db_connection():
     conn = sqlite3.connect('news.db')
     conn.row_factory = sqlite3.Row
@@ -384,6 +392,69 @@ async def post_high_relevance_articles(threshold: float = 0.75):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error posting to Teams: {str(e)}")
+
+@api_router.get("/pickup-results", response_model=List[PickupResult])
+async def get_pickup_results():
+    """Analyze registered articles for relevance and return pickup candidates for Teams posting."""
+    try:
+        config = Config.load_from_file("config.json")
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        articles = [{"id": row["id"], "url": row["url"]} for row in c.execute("SELECT id, url FROM articles")]
+        keywords = [row["word"] for row in c.execute("SELECT word FROM keywords")]
+        companies = [row["name"] for row in c.execute("SELECT name FROM companies")]
+        
+        pickup_results = []
+        collector = NewsCollector(config)
+        
+        for article in articles:
+            try:
+                article_url = article["url"]
+                article_data = collector.fetch_article_content(article_url)
+                if not article_data:
+                    continue
+                
+                title = article_data.get('title', 'No Title')
+                content = article_data.get('content', '') + ' ' + title
+                
+                matching_keywords = [kw for kw in keywords if kw in content]
+                matching_companies = [comp for comp in companies if comp in content]
+                
+                total_matches = len(matching_keywords) + len(matching_companies)
+                total_possible = len(keywords) + len(companies)
+                score = total_matches / max(total_possible, 1) if total_possible > 0 else 0.0
+                
+                if score > 0.8:
+                    importance = "High"
+                elif score > 0.5:
+                    importance = "Medium"
+                else:
+                    importance = "Low"
+                
+                summary = content[:300] + "..." if len(content) > 300 else content
+                if not summary.strip():
+                    summary = title[:300] + "..." if len(title) > 300 else title
+                
+                pickup_result = PickupResult(
+                    title=title,
+                    matched_keywords=matching_keywords,
+                    matched_companies=matching_companies,
+                    importance=importance,
+                    summary=summary,
+                    url=article_url
+                )
+                pickup_results.append(pickup_result)
+                
+            except Exception as e:
+                logging.getLogger(__name__).warning(f"Error processing article {article.get('url', 'unknown')}: {e}")
+                continue
+        
+        conn.close()
+        return pickup_results
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating pickup results: {str(e)}")
 
 app.include_router(api_router)
 
