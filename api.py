@@ -74,13 +74,30 @@ class PickupResult(BaseModel):
     url: str
 
 def get_db_connection():
-    conn = sqlite3.connect('news.db')
+    import os
+    
+    db_paths = [
+        os.environ.get('DATABASE_PATH', ''),
+        '/tmp/news.db',
+        './news.db'
+    ]
+    
+    db_path = next((path for path in db_paths if path), './news.db')
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Using database path: {os.path.abspath(db_path)}")
+    
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_database():
+    logger = logging.getLogger(__name__)
     conn = get_db_connection()
     c = conn.cursor()
+    
+    db_path = conn.execute("PRAGMA database_list").fetchone()[2]
+    logger.info(f"Initializing database at: {db_path}")
     
     c.execute('''CREATE TABLE IF NOT EXISTS articles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,8 +114,29 @@ def init_database():
         name TEXT UNIQUE
     )''')
     
+    keyword_count = c.execute("SELECT COUNT(*) FROM keywords").fetchone()[0]
+    if keyword_count == 0:
+        seed_keywords = ["太陽光発電", "CPPA", "PPA", "系統用蓄電池"]
+        logger.info(f"Seeding {len(seed_keywords)} keywords")
+        for keyword in seed_keywords:
+            try:
+                c.execute("INSERT OR IGNORE INTO keywords (word) VALUES (?)", (keyword,))
+            except Exception as e:
+                logger.error(f"Error inserting seed keyword {keyword}: {e}")
+    
+    company_count = c.execute("SELECT COUNT(*) FROM companies").fetchone()[0]
+    if company_count == 0:
+        seed_companies = ["Tesla", "出光興産", "ENEOS"]
+        logger.info(f"Seeding {len(seed_companies)} companies")
+        for company in seed_companies:
+            try:
+                c.execute("INSERT OR IGNORE INTO companies (name) VALUES (?)", (company,))
+            except Exception as e:
+                logger.error(f"Error inserting seed company {company}: {e}")
+    
     conn.commit()
     conn.close()
+    logger.info("Database initialization completed")
 
 @app.on_event("startup")
 async def startup_event():
@@ -168,6 +206,9 @@ async def create_keyword(keyword: KeywordCreate):
 @api_router.get("/keywords", response_model=List[Keyword])
 @api_router.get("/keywords/", response_model=List[Keyword])
 async def get_keywords():
+    logger = logging.getLogger(__name__)
+    logger.info("GET /api/keywords endpoint called")
+    
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -175,6 +216,7 @@ async def get_keywords():
     for row in c.execute("SELECT id, word FROM keywords"):
         keywords.append(Keyword(id=row["id"], word=row["word"]))
     
+    logger.info(f"Returning {len(keywords)} keywords")
     conn.close()
     return keywords
 
@@ -210,6 +252,9 @@ async def create_company(company: CompanyCreate):
 @api_router.get("/companies", response_model=List[Company])
 @api_router.get("/companies/", response_model=List[Company])
 async def get_companies():
+    logger = logging.getLogger(__name__)
+    logger.info("GET /api/companies endpoint called")
+    
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -217,6 +262,7 @@ async def get_companies():
     for row in c.execute("SELECT id, name FROM companies"):
         companies.append(Company(id=row["id"], name=row["name"]))
     
+    logger.info(f"Returning {len(companies)} companies")
     conn.close()
     return companies
 
