@@ -99,9 +99,25 @@ class NewsCollector:
             
             for item in news_items:
                 try:
-                    title_elem = item.select_one(source["title_selector"])
-                    link_elem = item.select_one(source["link_selector"])
-                    date_elem = item.select_one(source.get("date_selector", ""))
+                    if source["title_selector"] == "self":
+                        title_elem = item
+                    elif source["title_selector"]:
+                        title_elem = item.select_one(source["title_selector"])
+                    else:
+                        title_elem = item
+                    
+                    if source["link_selector"] == "self":
+                        link_elem = item
+                    elif source["link_selector"]:
+                        link_elem = item.select_one(source["link_selector"])
+                    else:
+                        link_elem = item
+                    
+                    date_selector = source.get("date_selector", "")
+                    if date_selector:
+                        date_elem = item.select_one(date_selector)
+                    else:
+                        date_elem = None
                     
                     if title_elem and link_elem:
                         title = title_elem.get_text(strip=True)
