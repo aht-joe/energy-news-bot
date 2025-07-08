@@ -6,6 +6,7 @@ import sqlite3
 import sys
 import os
 import logging
+import json
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -114,6 +115,17 @@ def init_database():
         name TEXT UNIQUE
     )''')
     
+    c.execute('''CREATE TABLE IF NOT EXISTS pickup_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        matched_keywords TEXT,
+        matched_companies TEXT,
+        importance TEXT,
+        summary TEXT,
+        url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
     keyword_count = c.execute("SELECT COUNT(*) FROM keywords").fetchone()[0]
     if keyword_count == 0:
         seed_keywords = ["太陽光発電", "CPPA", "PPA", "系統用蓄電池"]
@@ -133,6 +145,41 @@ def init_database():
                 c.execute("INSERT OR IGNORE INTO companies (name) VALUES (?)", (company,))
             except Exception as e:
                 logger.error(f"Error inserting seed company {company}: {e}")
+    
+    pickup_count = c.execute("SELECT COUNT(*) FROM pickup_results").fetchone()[0]
+    if pickup_count == 0:
+        seed_pickup_results = [
+            {
+                "title": "太陽光発電の新技術開発",
+                "matched_keywords": ["太陽光発電"],
+                "matched_companies": ["Tesla"],
+                "importance": "High",
+                "summary": "太陽光発電の効率を向上させる新技術が開発されました...",
+                "url": "https://example.com/solar-tech"
+            },
+            {
+                "title": "ENEOS、再生可能エネルギー事業拡大",
+                "matched_keywords": ["PPA"],
+                "matched_companies": ["ENEOS"],
+                "importance": "Medium", 
+                "summary": "ENEOSが再生可能エネルギー事業の拡大を発表...",
+                "url": "https://example.com/eneos-renewable"
+            }
+        ]
+        logger.info(f"Seeding {len(seed_pickup_results)} pickup results")
+        for result in seed_pickup_results:
+            try:
+                c.execute("""INSERT OR IGNORE INTO pickup_results 
+                           (title, matched_keywords, matched_companies, importance, summary, url) 
+                           VALUES (?, ?, ?, ?, ?, ?)""", 
+                         (result["title"], 
+                          json.dumps(result["matched_keywords"]), 
+                          json.dumps(result["matched_companies"]),
+                          result["importance"], 
+                          result["summary"], 
+                          result["url"]))
+            except Exception as e:
+                logger.error(f"Error inserting seed pickup result {result['title']}: {e}")
     
     conn.commit()
     conn.close()
@@ -501,6 +548,39 @@ async def get_pickup_results():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating pickup results: {str(e)}")
+
+@api_router.get("/pickup_results", response_model=List[PickupResult])
+async def get_pickup_results_from_table():
+    """Get all pickup results from the pickup_results table."""
+    logger = logging.getLogger(__name__)
+    logger.info("GET /api/pickup_results endpoint called")
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    pickup_results = []
+    for row in c.execute("""SELECT title, matched_keywords, matched_companies, 
+                                  importance, summary, url FROM pickup_results"""):
+        try:
+            matched_keywords = json.loads(row["matched_keywords"]) if row["matched_keywords"] else []
+            matched_companies = json.loads(row["matched_companies"]) if row["matched_companies"] else []
+            
+            pickup_result = PickupResult(
+                title=row["title"],
+                matched_keywords=matched_keywords,
+                matched_companies=matched_companies,
+                importance=row["importance"],
+                summary=row["summary"],
+                url=row["url"]
+            )
+            pickup_results.append(pickup_result)
+        except Exception as e:
+            logger.warning(f"Error processing pickup result row: {e}")
+            continue
+    
+    logger.info(f"Returning {len(pickup_results)} pickup results from table")
+    conn.close()
+    return pickup_results
 
 app.include_router(api_router)
 
