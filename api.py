@@ -288,7 +288,7 @@ async def delete_company(company_id: int):
     conn.close()
     
     logger.info(f"Successfully deleted company: {company_name} (ID: {company_id})")
-    return {"message": "deleted"}
+    return {"message": "Company deleted successfully"}
 
 @api_router.get("/articles/{article_id}/relevance", response_model=RelevanceScore)
 async def get_article_relevance(article_id: int):
