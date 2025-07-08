@@ -220,7 +220,7 @@ async def get_keywords():
     conn.close()
     return keywords
 
-@api_router.delete("/keywords/{keyword_id}")
+@api_router.delete("/keywords/{keyword_id}", status_code=200)
 async def delete_keyword(keyword_id: int):
     conn = get_db_connection()
     c = conn.cursor()
