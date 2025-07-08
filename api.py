@@ -76,18 +76,29 @@ class PickupResult(BaseModel):
 
 def get_db_connection():
     import os
-    
+
     db_paths = [
+        os.environ.get('DB_PATH', ''),
         os.environ.get('DATABASE_PATH', ''),
+        '/data/news.db',  # Persistent volume path for production
         '/tmp/news.db',
         './news.db'
     ]
-    
+
     db_path = next((path for path in db_paths if path), './news.db')
-    
+
     logger = logging.getLogger(__name__)
+    logger.info(f"Database path candidates: {db_paths}")
     logger.info(f"Using database path: {os.path.abspath(db_path)}")
-    
+
+    db_dir = os.path.dirname(db_path)
+    if db_dir and not os.path.exists(db_dir):
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+            logger.info(f"Created database directory: {db_dir}")
+        except Exception as e:
+            logger.warning(f"Could not create database directory {db_dir}: {e}")
+
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
@@ -96,25 +107,28 @@ def init_database():
     logger = logging.getLogger(__name__)
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     db_path = conn.execute("PRAGMA database_list").fetchone()[2]
     logger.info(f"Initializing database at: {db_path}")
-    
+
+    disable_seeding = os.environ.get('DISABLE_SEEDING', '').lower() in ('true', '1', 'yes')
+    logger.info(f"Seeding disabled: {disable_seeding}")
+
     c.execute('''CREATE TABLE IF NOT EXISTS articles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         url TEXT UNIQUE
     )''')
-    
+
     c.execute('''CREATE TABLE IF NOT EXISTS keywords (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         word TEXT UNIQUE
     )''')
-    
+
     c.execute('''CREATE TABLE IF NOT EXISTS companies (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE
     )''')
-    
+
     c.execute('''CREATE TABLE IF NOT EXISTS pickup_results (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -125,62 +139,80 @@ def init_database():
         url TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
-    
+
     keyword_count = c.execute("SELECT COUNT(*) FROM keywords").fetchone()[0]
-    if keyword_count == 0:
-        seed_keywords = ["太陽光発電", "CPPA", "PPA", "系統用蓄電池"]
-        logger.info(f"Seeding {len(seed_keywords)} keywords")
-        for keyword in seed_keywords:
-            try:
-                c.execute("INSERT OR IGNORE INTO keywords (word) VALUES (?)", (keyword,))
-            except Exception as e:
-                logger.error(f"Error inserting seed keyword {keyword}: {e}")
-    
     company_count = c.execute("SELECT COUNT(*) FROM companies").fetchone()[0]
-    if company_count == 0:
-        seed_companies = ["Tesla", "出光興産", "ENEOS"]
-        logger.info(f"Seeding {len(seed_companies)} companies")
-        for company in seed_companies:
-            try:
-                c.execute("INSERT OR IGNORE INTO companies (name) VALUES (?)", (company,))
-            except Exception as e:
-                logger.error(f"Error inserting seed company {company}: {e}")
-    
     pickup_count = c.execute("SELECT COUNT(*) FROM pickup_results").fetchone()[0]
-    if pickup_count == 0:
-        seed_pickup_results = [
-            {
-                "title": "太陽光発電の新技術開発",
-                "matched_keywords": ["太陽光発電"],
-                "matched_companies": ["Tesla"],
-                "importance": "High",
-                "summary": "太陽光発電の効率を向上させる新技術が開発されました...",
-                "url": "https://example.com/solar-tech"
-            },
-            {
-                "title": "ENEOS、再生可能エネルギー事業拡大",
-                "matched_keywords": ["PPA"],
-                "matched_companies": ["ENEOS"],
-                "importance": "Medium", 
-                "summary": "ENEOSが再生可能エネルギー事業の拡大を発表...",
-                "url": "https://example.com/eneos-renewable"
-            }
-        ]
-        logger.info(f"Seeding {len(seed_pickup_results)} pickup results")
-        for result in seed_pickup_results:
-            try:
-                c.execute("""INSERT OR IGNORE INTO pickup_results 
-                           (title, matched_keywords, matched_companies, importance, summary, url) 
-                           VALUES (?, ?, ?, ?, ?, ?)""", 
-                         (result["title"], 
-                          json.dumps(result["matched_keywords"]), 
-                          json.dumps(result["matched_companies"]),
-                          result["importance"], 
-                          result["summary"], 
-                          result["url"]))
-            except Exception as e:
-                logger.error(f"Error inserting seed pickup result {result['title']}: {e}")
-    
+
+    logger.info(f"Current table counts - Keywords: {keyword_count}, Companies: {company_count}, Pickup results: {pickup_count}")
+
+    if not disable_seeding:
+        if keyword_count == 0:
+            seed_keywords = ["太陽光発電", "CPPA", "PPA", "系統用蓄電池"]
+            logger.info(f"Seeding {len(seed_keywords)} keywords")
+            for keyword in seed_keywords:
+                try:
+                    c.execute("INSERT OR IGNORE INTO keywords (word) VALUES (?)", (keyword,))
+                except Exception as e:
+                    logger.error(f"Error inserting seed keyword {keyword}: {e}")
+        else:
+            logger.info("Keywords table not empty, skipping keyword seeding")
+
+        if company_count == 0:
+            seed_companies = ["Tesla", "出光興産", "ENEOS"]
+            logger.info(f"Seeding {len(seed_companies)} companies")
+            for company in seed_companies:
+                try:
+                    c.execute("INSERT OR IGNORE INTO companies (name) VALUES (?)", (company,))
+                except Exception as e:
+                    logger.error(f"Error inserting seed company {company}: {e}")
+        else:
+            logger.info("Companies table not empty, skipping company seeding")
+
+        if pickup_count == 0:
+            seed_pickup_results = [
+                {
+                    "title": "太陽光発電の新技術開発",
+                    "matched_keywords": ["太陽光発電"],
+                    "matched_companies": ["Tesla"],
+                    "importance": "High",
+                    "summary": "太陽光発電の効率を向上させる新技術が開発されました...",
+                    "url": "https://example.com/solar-tech"
+                },
+                {
+                    "title": "ENEOS、再生可能エネルギー事業拡大",
+                    "matched_keywords": ["PPA"],
+                    "matched_companies": ["ENEOS"],
+                    "importance": "Medium",
+                    "summary": "ENEOSが再生可能エネルギー事業の拡大を発表...",
+                    "url": "https://example.com/eneos-renewable"
+                }
+            ]
+            logger.info(f"Seeding {len(seed_pickup_results)} pickup results")
+            for result in seed_pickup_results:
+                try:
+                    c.execute("""INSERT OR IGNORE INTO pickup_results
+                               (title, matched_keywords, matched_companies, importance, summary, url)
+                               VALUES (?, ?, ?, ?, ?, ?)""",
+                             (result["title"],
+                              json.dumps(result["matched_keywords"]),
+                              json.dumps(result["matched_companies"]),
+                              result["importance"],
+                              result["summary"],
+                              result["url"]))
+                except Exception as e:
+                    logger.error(f"Error inserting seed pickup result {result['title']}: {e}")
+        else:
+            logger.info("Pickup results table not empty, skipping pickup results seeding")
+    else:
+        logger.info("Seeding disabled via DISABLE_SEEDING environment variable")
+
+    final_keyword_count = c.execute("SELECT COUNT(*) FROM keywords").fetchone()[0]
+    final_company_count = c.execute("SELECT COUNT(*) FROM companies").fetchone()[0]
+    final_pickup_count = c.execute("SELECT COUNT(*) FROM pickup_results").fetchone()[0]
+
+    logger.info(f"Final table counts - Keywords: {final_keyword_count}, Companies: {final_company_count}, Pickup results: {final_pickup_count}")
+
     conn.commit()
     conn.close()
     logger.info("Database initialization completed")
@@ -197,7 +229,7 @@ async def root():
 async def create_article(article: ArticleCreate):
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     try:
         c.execute("INSERT INTO articles (url) VALUES (?)", (article.url,))
         article_id = c.lastrowid
@@ -213,11 +245,11 @@ async def create_article(article: ArticleCreate):
 async def get_articles():
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     articles = []
     for row in c.execute("SELECT id, url FROM articles"):
         articles.append(Article(id=row["id"], url=row["url"]))
-    
+
     conn.close()
     return articles
 
@@ -225,12 +257,12 @@ async def get_articles():
 async def delete_article(article_id: int):
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     c.execute("DELETE FROM articles WHERE id = ?", (article_id,))
     if c.rowcount == 0:
         conn.close()
         raise HTTPException(status_code=404, detail="Article not found")
-    
+
     conn.commit()
     conn.close()
     return {"message": "Article deleted successfully"}
@@ -239,7 +271,7 @@ async def delete_article(article_id: int):
 async def create_keyword(keyword: KeywordCreate):
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     try:
         c.execute("INSERT INTO keywords (word) VALUES (?)", (keyword.word,))
         keyword_id = c.lastrowid
@@ -255,14 +287,14 @@ async def create_keyword(keyword: KeywordCreate):
 async def get_keywords():
     logger = logging.getLogger(__name__)
     logger.info("GET /api/keywords endpoint called")
-    
+
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     keywords = []
     for row in c.execute("SELECT id, word FROM keywords"):
         keywords.append(Keyword(id=row["id"], word=row["word"]))
-    
+
     logger.info(f"Returning {len(keywords)} keywords")
     conn.close()
     return keywords
@@ -271,12 +303,12 @@ async def get_keywords():
 async def delete_keyword(keyword_id: int):
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     c.execute("DELETE FROM keywords WHERE id = ?", (keyword_id,))
     if c.rowcount == 0:
         conn.close()
         raise HTTPException(status_code=404, detail="Keyword not found")
-    
+
     conn.commit()
     conn.close()
     return {"message": "Keyword deleted successfully"}
@@ -285,7 +317,7 @@ async def delete_keyword(keyword_id: int):
 async def create_company(company: CompanyCreate):
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     try:
         c.execute("INSERT INTO companies (name) VALUES (?)", (company.name,))
         company_id = c.lastrowid
@@ -301,14 +333,14 @@ async def create_company(company: CompanyCreate):
 async def get_companies():
     logger = logging.getLogger(__name__)
     logger.info("GET /api/companies endpoint called")
-    
+
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     companies = []
     for row in c.execute("SELECT id, name FROM companies"):
         companies.append(Company(id=row["id"], name=row["name"]))
-    
+
     logger.info(f"Returning {len(companies)} companies")
     conn.close()
     return companies
@@ -317,23 +349,23 @@ async def get_companies():
 async def delete_company(company_id: int):
     logger = logging.getLogger(__name__)
     logger.info(f"DELETE request received for company ID: {company_id}")
-    
+
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     company_row = c.execute("SELECT name FROM companies WHERE id = ?", (company_id,)).fetchone()
     if not company_row:
         conn.close()
         logger.info(f"Company with ID {company_id} not found")
         raise HTTPException(status_code=404, detail="Company not found")
-    
+
     company_name = company_row["name"]
     logger.info(f"Deleting company: {company_name} (ID: {company_id})")
-    
+
     c.execute("DELETE FROM companies WHERE id = ?", (company_id,))
     conn.commit()
     conn.close()
-    
+
     logger.info(f"Successfully deleted company: {company_name} (ID: {company_id})")
     return {"message": "Company deleted successfully"}
 
@@ -341,45 +373,45 @@ async def delete_company(company_id: int):
 async def get_article_relevance(article_id: int):
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     article_row = c.execute("SELECT url FROM articles WHERE id = ?", (article_id,)).fetchone()
     if not article_row:
         conn.close()
         raise HTTPException(status_code=404, detail="Article not found")
-    
+
     article_url = article_row["url"]
-    
+
     try:
         config = Config.load_from_file("config.json")
         collector = NewsCollector(config)
         processor = NewsProcessor(config)
-        
+
         article_data = collector.fetch_article_content(article_url)
         if not article_data:
             conn.close()
             raise HTTPException(status_code=400, detail="Could not fetch article content")
-        
+
         keywords = [row["word"] for row in c.execute("SELECT word FROM keywords")]
         companies = [row["name"] for row in c.execute("SELECT name FROM companies")]
-        
+
         matching_keywords = []
         matching_companies = []
-        
+
         content = article_data.get('content', '') + ' ' + article_data.get('title', '')
-        
+
         for keyword in keywords:
             if keyword in content:
                 matching_keywords.append(keyword)
-        
+
         for company in companies:
             if company in content:
                 matching_companies.append(company)
-        
+
         total_matches = len(matching_keywords) + len(matching_companies)
         total_possible = len(keywords) + len(companies)
-        
+
         score = total_matches / max(total_possible, 1) if total_possible > 0 else 0.0
-        
+
         conn.close()
         return RelevanceScore(
             article_url=article_url,
@@ -387,7 +419,7 @@ async def get_article_relevance(article_id: int):
             matching_keywords=matching_keywords,
             matching_companies=matching_companies
         )
-        
+
     except Exception as e:
         conn.close()
         raise HTTPException(status_code=500, detail=f"Error calculating relevance: {str(e)}")
@@ -396,20 +428,20 @@ async def get_article_relevance(article_id: int):
 async def process_articles():
     try:
         config = Config.load_from_file("config.json")
-        
+
         collector = NewsCollector(config)
         news_articles = collector.collect_news()
-        
+
         processor = NewsProcessor(config)
         processed_articles = processor.process_articles(news_articles)
-        
+
         posted_count = 0
         if processed_articles:
             notifier = TeamsNotifier(config)
             articles_to_post = processed_articles[:config.max_teams_posts]
             notifier.post_articles(articles_to_post)
             posted_count = len(articles_to_post)
-        
+
         conn = get_db_connection()
         c = conn.cursor()
         for article in news_articles:
@@ -419,14 +451,14 @@ async def process_articles():
                 pass
         conn.commit()
         conn.close()
-        
+
         return ProcessingResult(
             collected_articles=len(news_articles),
             processed_articles=len(processed_articles),
             posted_to_teams=posted_count,
             message=f"Successfully processed {len(news_articles)} articles, {len(processed_articles)} passed filtering, {posted_count} posted to Teams"
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing articles: {str(e)}")
 
@@ -436,45 +468,45 @@ async def post_high_relevance_articles(threshold: float = 0.75):
         config = Config.load_from_file("config.json")
         conn = get_db_connection()
         c = conn.cursor()
-        
+
         articles = [row["url"] for row in c.execute("SELECT url FROM articles")]
         keywords = [row["word"] for row in c.execute("SELECT word FROM keywords")]
         companies = [row["name"] for row in c.execute("SELECT name FROM companies")]
-        
+
         high_relevance_articles = []
         collector = NewsCollector(config)
-        
+
         for article_url in articles:
             try:
                 article_data = collector.fetch_article_content(article_url)
                 if not article_data:
                     continue
-                
+
                 content = article_data.get('content', '') + ' ' + article_data.get('title', '')
-                
+
                 matching_keywords = [kw for kw in keywords if kw in content]
                 matching_companies = [comp for comp in companies if comp in content]
-                
+
                 total_matches = len(matching_keywords) + len(matching_companies)
                 total_possible = len(keywords) + len(companies)
                 score = total_matches / max(total_possible, 1) if total_possible > 0 else 0.0
-                
+
                 if score >= threshold:
                     article_data['relevance_score'] = score
                     article_data['matching_keywords'] = matching_keywords
                     article_data['matching_companies'] = matching_companies
                     high_relevance_articles.append(article_data)
-                    
+
             except Exception as e:
                 continue
-        
+
         posted_count = 0
         if high_relevance_articles:
             notifier = TeamsNotifier(config)
             articles_to_post = high_relevance_articles[:config.max_teams_posts]
             notifier.post_articles(articles_to_post)
             posted_count = len(articles_to_post)
-        
+
         conn.close()
         return {
             "message": f"Posted {posted_count} high-relevance articles to Teams",
@@ -482,7 +514,7 @@ async def post_high_relevance_articles(threshold: float = 0.75):
             "articles_posted": posted_count,
             "total_high_relevance": len(high_relevance_articles)
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error posting to Teams: {str(e)}")
 
@@ -493,42 +525,42 @@ async def get_pickup_results():
         config = Config.load_from_file("config.json")
         conn = get_db_connection()
         c = conn.cursor()
-        
+
         articles = [{"id": row["id"], "url": row["url"]} for row in c.execute("SELECT id, url FROM articles")]
         keywords = [row["word"] for row in c.execute("SELECT word FROM keywords")]
         companies = [row["name"] for row in c.execute("SELECT name FROM companies")]
-        
+
         pickup_results = []
         collector = NewsCollector(config)
-        
+
         for article in articles:
             try:
                 article_url = article["url"]
                 article_data = collector.fetch_article_content(article_url)
                 if not article_data:
                     continue
-                
+
                 title = article_data.get('title', 'No Title')
                 content = article_data.get('content', '') + ' ' + title
-                
+
                 matching_keywords = [kw for kw in keywords if kw in content]
                 matching_companies = [comp for comp in companies if comp in content]
-                
+
                 total_matches = len(matching_keywords) + len(matching_companies)
                 total_possible = len(keywords) + len(companies)
                 score = total_matches / max(total_possible, 1) if total_possible > 0 else 0.0
-                
+
                 if score > 0.8:
                     importance = "High"
                 elif score > 0.5:
                     importance = "Medium"
                 else:
                     importance = "Low"
-                
+
                 summary = content[:300] + "..." if len(content) > 300 else content
                 if not summary.strip():
                     summary = title[:300] + "..." if len(title) > 300 else title
-                
+
                 pickup_result = PickupResult(
                     title=title,
                     matched_keywords=matching_keywords,
@@ -538,14 +570,14 @@ async def get_pickup_results():
                     url=article_url
                 )
                 pickup_results.append(pickup_result)
-                
+
             except Exception as e:
                 logging.getLogger(__name__).warning(f"Error processing article {article.get('url', 'unknown')}: {e}")
                 continue
-        
+
         conn.close()
         return pickup_results
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating pickup results: {str(e)}")
 
@@ -554,17 +586,17 @@ async def get_pickup_results_from_table():
     """Get all pickup results from the pickup_results table."""
     logger = logging.getLogger(__name__)
     logger.info("GET /api/pickup_results endpoint called")
-    
+
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     pickup_results = []
-    for row in c.execute("""SELECT title, matched_keywords, matched_companies, 
+    for row in c.execute("""SELECT title, matched_keywords, matched_companies,
                                   importance, summary, url FROM pickup_results"""):
         try:
             matched_keywords = json.loads(row["matched_keywords"]) if row["matched_keywords"] else []
             matched_companies = json.loads(row["matched_companies"]) if row["matched_companies"] else []
-            
+
             pickup_result = PickupResult(
                 title=row["title"],
                 matched_keywords=matched_keywords,
@@ -577,7 +609,7 @@ async def get_pickup_results_from_table():
         except Exception as e:
             logger.warning(f"Error processing pickup result row: {e}")
             continue
-    
+
     logger.info(f"Returning {len(pickup_results)} pickup results from table")
     conn.close()
     return pickup_results
