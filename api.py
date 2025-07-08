@@ -77,7 +77,7 @@ class PickupResult(BaseModel):
 def get_db_connection():
     import os
 
-    db_paths = [
+    db_path_candidates = [
         os.environ.get('DB_PATH', ''),
         os.environ.get('DATABASE_PATH', ''),
         '/data/news.db',  # Persistent volume path for production
@@ -85,19 +85,39 @@ def get_db_connection():
         './news.db'
     ]
 
-    db_path = next((path for path in db_paths if path), './news.db')
-
     logger = logging.getLogger(__name__)
-    logger.info(f"Database path candidates: {db_paths}")
-    logger.info(f"Using database path: {os.path.abspath(db_path)}")
+    logger.info(f"Database path candidates: {db_path_candidates}")
 
-    db_dir = os.path.dirname(db_path)
-    if db_dir and not os.path.exists(db_dir):
+    db_path = None
+    for candidate in db_path_candidates:
+        if not candidate:  # Skip empty strings
+            continue
+            
+        logger.info(f"Trying database path: {os.path.abspath(candidate)}")
+        
+        db_dir = os.path.dirname(candidate)
+        if db_dir and not os.path.exists(db_dir):
+            try:
+                os.makedirs(db_dir, exist_ok=True)
+                logger.info(f"Created database directory: {db_dir}")
+            except Exception as e:
+                logger.warning(f"Could not create database directory {db_dir}: {e}")
+                logger.info(f"Skipping path {candidate} due to directory creation failure")
+                continue  # Skip this path and try the next one
+        
         try:
-            os.makedirs(db_dir, exist_ok=True)
-            logger.info(f"Created database directory: {db_dir}")
+            test_conn = sqlite3.connect(candidate)
+            test_conn.close()
+            db_path = candidate
+            logger.info(f"Successfully selected database path: {os.path.abspath(db_path)}")
+            break
         except Exception as e:
-            logger.warning(f"Could not create database directory {db_dir}: {e}")
+            logger.warning(f"Could not access database at {candidate}: {e}")
+            continue  # Try the next path
+
+    if not db_path:
+        db_path = './news.db'
+        logger.warning(f"All database paths failed, using fallback: {os.path.abspath(db_path)}")
 
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
