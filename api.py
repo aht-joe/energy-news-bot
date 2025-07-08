@@ -222,17 +222,34 @@ async def get_keywords():
 
 @api_router.delete("/keywords/{keyword_id}")
 async def delete_keyword(keyword_id: int):
-    conn = get_db_connection()
-    c = conn.cursor()
+    logger = logging.getLogger(__name__)
+    logger.info(f"DELETE request received for keyword ID: {keyword_id}")
     
-    c.execute("DELETE FROM keywords WHERE id = ?", (keyword_id,))
-    if c.rowcount == 0:
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        keyword_row = c.execute("SELECT word FROM keywords WHERE id = ?", (keyword_id,)).fetchone()
+        if not keyword_row:
+            conn.close()
+            logger.info(f"Keyword with ID {keyword_id} not found")
+            raise HTTPException(status_code=404, detail="Keyword not found")
+        
+        keyword_word = keyword_row["word"]
+        logger.info(f"Deleting keyword: {keyword_word} (ID: {keyword_id})")
+        
+        c.execute("DELETE FROM keywords WHERE id = ?", (keyword_id,))
+        conn.commit()
         conn.close()
-        raise HTTPException(status_code=404, detail="Keyword not found")
-    
-    conn.commit()
-    conn.close()
-    return {"message": "Keyword deleted successfully"}
+        
+        logger.info(f"Successfully deleted keyword: {keyword_word} (ID: {keyword_id})")
+        return {"message": "Keyword deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting keyword ID {keyword_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @api_router.post("/companies/", response_model=Company)
 async def create_company(company: CompanyCreate):
